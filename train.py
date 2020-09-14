@@ -7,7 +7,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from edge_promoting import edge_promoting
-
+# python CartoonGAN.py --name cartoon1 --src_data src_data --tgt_data tgt_data --vgg_model vgg19-dcbb9e9d.pth
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', required=False, default='project_name',  help='')
