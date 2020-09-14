@@ -180,11 +180,14 @@ if __name__ == "__main__":
     start_time = time.time()
     real = torch.ones(args.batch_size, 1, args.input_size // 4, args.input_size // 4).to(device)
     fake = torch.zeros(args.batch_size, 1, args.input_size // 4, args.input_size // 4).to(device)
+    flag_start = False
     for epoch in range(args.train_epoch):
         epoch_start_time = time.time()
         G.train()
-        G_scheduler.step()
-        D_scheduler.step()
+        if flag_start :
+            G_scheduler.step()
+            D_scheduler.step()
+        flag_start = True
         Disc_losses = []
         Gen_losses = []
         Con_losses = []
