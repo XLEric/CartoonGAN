@@ -7,7 +7,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from edge_promoting import edge_promoting
-# python CartoonGAN.py --name cartoon1 --src_data src_data --tgt_data tgt_data --vgg_model vgg19-dcbb9e9d.pth
+# python train.py --name cartoon1 --src_data src_data --tgt_data tgt_data --vgg_model vgg19-dcbb9e9d.pth
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', required=False, default='project_name',  help='')
@@ -180,14 +180,11 @@ if __name__ == "__main__":
     start_time = time.time()
     real = torch.ones(args.batch_size, 1, args.input_size // 4, args.input_size // 4).to(device)
     fake = torch.zeros(args.batch_size, 1, args.input_size // 4, args.input_size // 4).to(device)
-    flag_start = False
     for epoch in range(args.train_epoch):
         epoch_start_time = time.time()
         G.train()
-        if flag_start :
-            G_scheduler.step()
-            D_scheduler.step()
-        flag_start = True
+        G_scheduler.step()
+        D_scheduler.step()
         Disc_losses = []
         Gen_losses = []
         Con_losses = []
@@ -209,7 +206,7 @@ if __name__ == "__main__":
             D_edge = D(e)
             D_edge_loss = BCE_loss(D_edge, fake)
 
-            Disc_loss = D_real_loss + 10.*D_fake_loss + D_edge_loss
+            Disc_loss = 5.*D_real_loss + 10.*D_fake_loss + D_edge_loss
             Disc_losses.append(Disc_loss.item())
             train_hist['Disc_loss'].append(Disc_loss.item())
 
