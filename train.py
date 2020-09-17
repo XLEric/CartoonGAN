@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('--ndf', type=int, default=32)
     parser.add_argument('--nb', type=int, default=8, help='the number of resnet block layer for generator')
     parser.add_argument('--input_size', type=int, default=256, help='input size')
-    parser.add_argument('--train_epoch', type=int, default=100)
+    parser.add_argument('--train_epoch', type=int, default=1000)
     parser.add_argument('--pre_train_epoch', type=int, default=10)
     parser.add_argument('--lrD', type=float, default=0.0002, help='learning rate, default=0.0002')
     parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate, default=0.0002')
@@ -32,6 +32,8 @@ if __name__ == "__main__":
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
     parser.add_argument('--latest_generator_model', required=False, default='./cartoon1_results/generator_latest.pkl', help='the latest trained model path')
     parser.add_argument('--latest_discriminator_model', required=False, default='./cartoon1_results/discriminator_latest.pkl', help='the latest trained model path')
+#     parser.add_argument('--latest_generator_model', required=False, default='', help='the latest trained model path')
+#     parser.add_argument('--latest_discriminator_model', required=False, default='', help='the latest trained model path')
     args = parser.parse_args()
 
     print('------------ Options -------------')
@@ -49,10 +51,11 @@ if __name__ == "__main__":
     if not os.path.isdir(os.path.join(args.name + '_results', 'Transfer')):
         os.makedirs(os.path.join(args.name + '_results', 'Transfer'))
 
+    train_path  = 'data'
     # edge-promoting
-    if not os.path.isdir(os.path.join('data', args.tgt_data, 'pair')):
+    if not os.path.isdir(os.path.join(train_path, args.tgt_data, 'pair')):
         print('edge-promoting start!!')
-        edge_promoting(os.path.join('data', args.tgt_data, 'train'), os.path.join('data', args.tgt_data, 'pair'))
+        edge_promoting(os.path.join(train_path, args.tgt_data, 'train'), os.path.join(train_path, args.tgt_data, 'pair'))
     else:
         print('edge-promoting already done')
 
@@ -66,9 +69,9 @@ if __name__ == "__main__":
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
     ])
-    train_loader_src = utils.data_load(os.path.join('data', args.src_data), 'train', src_transform, args.batch_size, shuffle=True, drop_last=True)
-    train_loader_tgt = utils.data_load(os.path.join('data', args.tgt_data), 'pair', tgt_transform, args.batch_size, shuffle=True, drop_last=True)
-    test_loader_src = utils.data_load(os.path.join('data', args.src_data), 'test', src_transform, 1, shuffle=True, drop_last=True)
+    train_loader_src = utils.data_load(os.path.join(train_path, args.src_data), 'train', src_transform, args.batch_size, shuffle=True, drop_last=True)
+    train_loader_tgt = utils.data_load(os.path.join(train_path, args.tgt_data), 'pair', tgt_transform, args.batch_size, shuffle=True, drop_last=True)
+    test_loader_src = utils.data_load(os.path.join(train_path, args.src_data), 'test', src_transform, 1, shuffle=True, drop_last=True)
 
     # network
     G = networks.generator(args.in_ngc, args.out_ngc, args.ngf, args.nb)
@@ -209,7 +212,7 @@ if __name__ == "__main__":
             D_edge = D(e)
             D_edge_loss = BCE_loss(D_edge, fake)
 
-            Disc_loss = 5.*D_real_loss + 10.*D_fake_loss + D_edge_loss
+            Disc_loss = D_real_loss + 3.*D_fake_loss + D_edge_loss
             Disc_losses.append(Disc_loss.item())
             train_hist['Disc_loss'].append(Disc_loss.item())
 
@@ -223,11 +226,11 @@ if __name__ == "__main__":
             D_fake = D(G_)
             D_fake_loss = BCE_loss(D_fake, real)
 
-            x_feature = VGG((x + 1) / 2)
-            G_feature = VGG((G_ + 1) / 2)
+            x_feature = VGG((x + 1.) / 2.)
+            G_feature = VGG((G_ + 1.) / 2.)
             Con_loss = args.con_lambda * L1_loss(G_feature, x_feature.detach())
 
-            Gen_loss = D_fake_loss + Con_loss
+            Gen_loss = 10.*D_fake_loss + 3.*Con_loss
             Gen_losses.append(D_fake_loss.item())
             train_hist['Gen_loss'].append(D_fake_loss.item())
             Con_losses.append(Con_loss.item())
@@ -245,12 +248,13 @@ if __name__ == "__main__":
 
         if epoch % 1 == 0 or epoch == args.train_epoch - 1:
             with torch.no_grad():
+                os.makedirs(os.path.join(args.name + '_results', 'Transfer','epoch_'+str(epoch+1)))
                 G.eval()
                 for n, (x, _) in enumerate(train_loader_src):
                     x = x.to(device)
                     G_recon = G(x)
                     result = torch.cat((x[0], G_recon[0]), 2)
-                    path = os.path.join(args.name + '_results', 'Transfer', str(epoch+1) + '_epoch_' + args.name + '_train_' + str(n + 1) + '.png')
+                    path = os.path.join(args.name + '_results', 'Transfer', 'epoch_'+str(epoch+1),str(epoch+1) + '_epoch_' + args.name + '_train_' + str(n + 1) + '.png')
                     plt.imsave(path, (result.cpu().numpy().transpose(1, 2, 0) + 1) / 2)
                     if n == 4:
                         break
@@ -259,9 +263,9 @@ if __name__ == "__main__":
                     x = x.to(device)
                     G_recon = G(x)
                     result = torch.cat((x[0], G_recon[0]), 2)
-                    path = os.path.join(args.name + '_results', 'Transfer', str(epoch+1) + '_epoch_' + args.name + '_test_' + str(n + 1) + '.png')
+                    path = os.path.join(args.name + '_results', 'Transfer', 'epoch_'+str(epoch+1),str(epoch+1) + '_epoch_' + args.name + '_test_' + str(n + 1) + '.png')
                     plt.imsave(path, (result.cpu().numpy().transpose(1, 2, 0) + 1) / 2)
-                    if n == 4:
+                    if n == 30:
                         break
 
                 torch.save(G.state_dict(), os.path.join(args.name + '_results', 'generator_latest.pkl'))
